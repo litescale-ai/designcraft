@@ -939,7 +939,6 @@ fn embedded_documents_keep_their_older_version_and_version_5_loads() {
     assert_eq!(loaded.assets.len(), d.assets.len());
 }
 
-<<<<<<< HEAD
 #[test]
 fn note_series_native_roundtrip_and_legacy_defaults() {
     use designcraft_doc::{FootnoteOptions, MarginSide, NotePlacement, NoteSeries};

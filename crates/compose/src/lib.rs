@@ -1697,7 +1697,11 @@ fn place_table_paragraph(input: TableParagraphInput<'_>) -> TableParagraphResult
     let placed = table::place_table(doc, table, anchor, paragraph, props, frames, columns, cursor, out, notes, opts);
     let first_at = out.frames.iter().enumerate().skip(base_fi).find_map(|(fi, ft)| {
         let skip_t = if fi == base_fi { base_frags } else { 0 };
-        ft.tables.iter().skip(skip_t).find(|frag| frag.anchor == anchor && frag.first).map(|frag| logical_column(fi, frag.column as usize, &cursor.continuations))
+        ft.tables
+            .iter()
+            .skip(skip_t)
+            .find(|frag| frag.anchor == anchor && frag.first)
+            .map(|frag| logical_column(fi, frag.column as usize, &cursor.continuations))
     });
     // A table can leave this column before placing even its first row. Keep its heading chain with that row.
     if first_at.is_some_and(|at| at > start_at)
