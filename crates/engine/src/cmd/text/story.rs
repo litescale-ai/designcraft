@@ -53,7 +53,7 @@ pub(super) fn story_lines(s: &mut Session, p: &Value) -> Result<Value> {
             lines.push(json!({
                 "start": line.range.start, "end": line.range.end, "frame": ft.frame.0,
                 "column": line.column, "page": page, "paragraph": line.para,
-                "baseline": baseline, "left": left, "top": top, "right": right, "bottom": bottom,
+                "baseline": baseline, "leading": line.leading, "left": left, "top": top, "right": right, "bottom": bottom,
             }));
         }
     }
@@ -678,5 +678,44 @@ mod story_lines_tests {
         let line = &r["lines"][0];
         assert!(line["right"].as_f64().unwrap() < 0.0, "{line}");
         assert_eq!(line["page"], json!(null), "{line}");
+    }
+
+    /// Each line reports its leading, the largest in the line: a 12 pt line under a line with a
+    /// 30 pt word, and the baselines step by it.
+    #[test]
+    fn story_lines_report_each_line_leading() {
+        let mut s = Session::new();
+        s.execute("file.new", &json!({})).unwrap();
+        let text = "Small words on the first line\rBIG and small words\rSmall words again";
+        let r = s.execute("frame.create", &json!({"rect": [72, 72, 500, 400], "content": "text", "text": text})).unwrap();
+        let sid = r["story"].as_u64().unwrap();
+        s.execute("text.select", &json!({"story": sid, "anchor": 0, "focus": text.len()})).unwrap();
+        s.execute("type.char", &json!({"attrs": {"size": 10, "leading": {"kind": "points", "value": 12}}})).unwrap();
+        let big = text.find("BIG").unwrap();
+        s.execute("text.select", &json!({"story": sid, "anchor": big, "focus": big + 3})).unwrap();
+        s.execute("type.char", &json!({"attrs": {"size": 25, "leading": {"kind": "points", "value": 30}}})).unwrap();
+
+        let r = s.execute("story.lines", &json!({"story": sid})).unwrap();
+        let lines = r["lines"].as_array().unwrap();
+        assert_eq!(lines.len(), 3, "{r}");
+        let leading: Vec<f64> = lines.iter().map(|l| l["leading"].as_f64().unwrap()).collect();
+        assert_eq!(leading, [12.0, 30.0, 12.0], "{r}");
+        let baselines: Vec<f64> = lines.iter().map(|l| l["baseline"].as_f64().unwrap()).collect();
+        assert!((baselines[1] - baselines[0] - 30.0).abs() < 0.01, "the big line is 30 pt below: {baselines:?}");
+        assert!((baselines[2] - baselines[1] - 12.0).abs() < 0.01, "the next 12 pt below it: {baselines:?}");
+    }
+
+    /// An empty story has one empty line, where the caret goes, and nothing overset.
+    #[test]
+    fn story_lines_of_an_empty_story_are_one_empty_line() {
+        let mut s = Session::new();
+        s.execute("file.new", &json!({})).unwrap();
+        let f = s.execute("frame.create", &json!({"rect": [72, 72, 300, 200], "content": "text"})).unwrap();
+        let r = s.execute("story.lines", &json!({"story": f["story"]})).unwrap();
+        let lines = r["lines"].as_array().unwrap();
+        assert_eq!(lines.len(), 1, "{r}");
+        assert_eq!((&lines[0]["start"], &lines[0]["end"], &lines[0]["frame"]), (&json!(0), &json!(0), &f["id"]), "{r}");
+        assert_eq!(lines[0]["page"], 0, "{r}");
+        assert_eq!(r["overset"], json!(null), "{r}");
     }
 }
